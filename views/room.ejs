@@ -8,9 +8,9 @@
       <p id="server-time"></p>
       <p><video id="localVideo" autoplay playsinline></video></p>
       <button onclick="stopLocalStream()">Stop Local Stream</button>
-      <ul id = "peerList">
+      <div id = "peerList">
 
-      </ul>
+      </div>
     </body>
     <script>
         const peerConnections = {};
@@ -34,23 +34,104 @@
         // });
         const mediaStreamConstraints = {
           video: true,
+          audio : true,
         };
         let localstream;
         function gotLocalMediaStream(mediaStream) {
           localStream = mediaStream;
           localVideo.srcObject = mediaStream;
-          socket.emit("room number",{"roomNumber":roomNumber});
+          console.log("Sending room number message")
+          socket.emit("room number",{"roomNumber":<%= roomNumber %>});
         }
         function handleLocalMediaStreamError(error) {
           console.log('navigator.getUserMedia error: ', error);
         }
-        navigator.mediaDevices.getUserMedia(mediaStreamConstraints).then(gotLocalMediaStream).catch(handleLocalMediaStreamError);
+        navigator.mediaDevices.getUserMedia(constraints).then(gotLocalMediaStream).catch(handleLocalMediaStreamError);
+
+
         function stopLocalStream(){
           const tracks = localStream.getTracks();
           tracks.forEach(function(track) {
             track.stop();
           });
           socket.emit("stop");
+        };
+        socket.on("new member", id => {
+          const peerConnection = new RTCPeerConnection(config);
+          peerConnections[id] = peerConnection;
+          let stream = localVideo.srcObject;
+          stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+            
+          peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+              socket.emit("candidate", id, event.candidate);
+            }
+          };
+
+          peerConnection
+            .createOffer()
+            .then(sdp => peerConnection.setLocalDescription(sdp))
+            .then(() => {
+              socket.emit("offer", id, peerConnection.localDescription);
+            });
+          peerConnection.ontrack = event => {
+            let peerlist = document.getElementById("peerList");
+            peerList.innerHTML += "<p><video id='"+String(id)+"' autoplay playsinline></video></p>";
+            console.log("Added video inner HTML");
+            let video = document.getElementById(String(id));
+            video.srcObject = event.streams[0];
+          };
+          peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+              socket.emit("candidate", id, event.candidate);
+            }
+          };
+        });
+        socket.on("answer", (id, description) => {
+          peerConnections[id].setRemoteDescription(description);
+        });
+        socket.on("offer", (id, description) => {
+          peerConnection = new RTCPeerConnection(config);
+          peerConnections[id] = peerConnection;
+          let stream = localVideo.srcObject;
+          stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
+          peerConnection
+            .setRemoteDescription(description)
+            .then(() => peerConnection.createAnswer())
+            .then(sdp => peerConnection.setLocalDescription(sdp))
+            .then(() => {
+              socket.emit("answer", id, peerConnection.localDescription);
+            });
+          peerConnection.ontrack = event => {
+            let peerlist = document.getElementById("peerList");
+            peerList.innerHTML = peerList.innerHTML+ "<p><video id='"+String(id)+"' autoplay playsinline></video></p>";
+            console.log("Added video inner HTML");
+            let video = document.getElementById(String(id));
+            video.srcObject = event.streams[0];
+          };
+          peerConnection.onicecandidate = event => {
+            if (event.candidate) {
+              console.log("Adding Ice candidate")
+              console.log(id)
+              socket.emit("candidate", id, event.candidate);
+            }
+          };
+        });
+        socket.on("candidate", (id, candidate) => {
+          let peerConnection = peerConnections[id]
+          peerConnection
+            .addIceCandidate(new RTCIceCandidate(candidate))
+            .catch(e => console.error(e));
+        });
+
+        socket.on("disconnectPeer", () => {
+          let peerConnection = peerConnections[id]
+          peerConnection.close();
+          delete peerConnections[id]
+        });
+
+        window.onunload = window.onbeforeunload = () => {
+          socket.close();
         };
     </script>
 

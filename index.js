@@ -19,7 +19,14 @@ io.on('connection', (socket) => {
     socket.on('room number', (paramList) => {
         roomNumber = paramList.roomNumber;
         console.log("Socket with id "+socket.id+" connected to room number "+roomNumber);
-        socket.to(String(roomNumber)).emit("candidate");
+        if(String(roomNumber) in clientList){
+            for(let i = 0; i<clientList[String(roomNumber)].length;i++){
+                if(clientList[String(roomNumber)][i] != socket.id){
+                socket.to(clientList[String(roomNumber)][i]).emit("new member",socket.id);
+                }
+            }
+        }
+
         socket.join(String(roomNumber));
         if(String(roomNumber) in clientList){
             clientList[String(roomNumber)].push(socket.id);
@@ -65,6 +72,15 @@ io.on('connection', (socket) => {
             delete clientList[String(currentRoom)];
         }
     }
+});
+socket.on("offer", (id, message) => {
+    socket.to(id).emit("offer", socket.id, message);
+});
+socket.on("answer", (id, message) => {
+  socket.to(id).emit("answer", socket.id, message);
+});
+socket.on("candidate", (id, message) => {
+  socket.to(id).emit("candidate", socket.id, message);
 });
 });
 
