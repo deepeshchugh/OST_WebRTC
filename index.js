@@ -46,7 +46,7 @@ io.on('connection', (socket) => {
                 clientList[String(currentRoom)].splice(i,1)
                 }
                 else{
-                    socket.to(io.sockets.connected[String(clientList[String(currentRoom)][i])]).emit('left',socket.id);
+                    socket.to(io.sockets.connected[String(clientList[String(currentRoom)][i])]).emit('disconnectPeer',socket.id);
                 }
                 console.log(clientList);
             }
@@ -64,7 +64,7 @@ io.on('connection', (socket) => {
             clientList[String(currentRoom)].splice(i,1)
             }
             else{
-                socket.to(io.sockets.connected[String(clientList[String(currentRoom)][i])]).emit('left',socket.id);
+                socket.to(io.sockets.connected[String(clientList[String(currentRoom)][i])]).emit('disconnectPeer',socket.id);
             }
             console.log(clientList);
         }

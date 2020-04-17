@@ -14,6 +14,8 @@
     </body>
     <script>
         const peerConnections = {};
+        const idList = [];
+        const sourceObjects = {};
         const config = {
           iceServers: [
             {
@@ -80,6 +82,12 @@
             console.log("Added video inner HTML");
             let video = document.getElementById(String(id));
             video.srcObject = event.streams[0];
+            sourceObjects[id] = video.srcObject;
+            for(let idx = 0;idx<idList.length;++idx){
+              let video = document.getElementById(String(idList[idx]));
+              video.srcObject = sourceObjects[idList[idx]];
+            }
+            idList.push(id)
           };
           peerConnection.onicecandidate = event => {
             if (event.candidate) {
@@ -95,19 +103,25 @@
           peerConnections[id] = peerConnection;
           let stream = localVideo.srcObject;
           stream.getTracks().forEach(track => peerConnection.addTrack(track, stream));
-          peerConnection
+          peerConnections[id]
             .setRemoteDescription(description)
             .then(() => peerConnection.createAnswer())
             .then(sdp => peerConnection.setLocalDescription(sdp))
             .then(() => {
               socket.emit("answer", id, peerConnection.localDescription);
             });
-          peerConnection.ontrack = event => {
+            peerConnection.ontrack = event => {
             let peerlist = document.getElementById("peerList");
-            peerList.innerHTML = peerList.innerHTML+ "<p><video id='"+String(id)+"' autoplay playsinline></video></p>";
+            peerList.innerHTML += "<p><video id='"+String(id)+"' autoplay playsinline></video></p>";
             console.log("Added video inner HTML");
             let video = document.getElementById(String(id));
             video.srcObject = event.streams[0];
+            sourceObjects[id] = video.srcObject;
+            for(let idx = 0;idx<idList.length;++idx){
+              let video = document.getElementById(String(idList[idx]));
+              video.srcObject = sourceObjects[idList[idx]];
+            }
+            idList.push(id)
           };
           peerConnection.onicecandidate = event => {
             if (event.candidate) {
@@ -116,18 +130,33 @@
               socket.emit("candidate", id, event.candidate);
             }
           };
+          let negotiating = false;
+          peerConnection.onnegotiationneeded = async e => {
+            try {
+              if (negotiating || peerConnection.signalingState != "stable") return;
+              negotiating = true;
+              /* Your async/await-using code goes here */
+            } finally {
+              negotiating = false;
+            }
+          }
         });
         socket.on("candidate", (id, candidate) => {
-          let peerConnection = peerConnections[id]
-          peerConnection
+          peerConnections[id]
             .addIceCandidate(new RTCIceCandidate(candidate))
             .catch(e => console.error(e));
         });
 
-        socket.on("disconnectPeer", () => {
+        socket.on("disconnectPeer", (id) => {
           let peerConnection = peerConnections[id]
           peerConnection.close();
           delete peerConnections[id]
+          delete sourceObjects[id]
+          for(let i = 0; i<idListlength;i++){
+            if(idList[i] == id){
+            idList.splice(i,1)
+            }
+        }
         });
 
         window.onunload = window.onbeforeunload = () => {
