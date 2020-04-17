@@ -1,0 +1,57 @@
+
+<html>
+    <head>
+      <script src="/socket.io/socket.io.js"></script>
+
+    </head>
+    <body>
+      <p id="server-time"></p>
+      <p><video id="localVideo" autoplay playsinline></video></p>
+      <button onclick="stopLocalStream()">Stop Local Stream</button>
+      <ul id = "peerList">
+
+      </ul>
+    </body>
+    <script>
+        const peerConnections = {};
+        const config = {
+          iceServers: [
+            {
+              urls: ["stun:stun.l.google.com:19302"]
+            }
+          ]
+        };
+        const localVideo = document.getElementById("localVideo");
+        const constraints = {
+          video: { facingMode: "user" },
+          // Uncomment to enable audio
+          audio: true,
+        };
+        let socket = io();
+        // socket.on('time', (timeString) => {
+        //   el = document.getElementById('server-time');
+        //   el.innerHTML = 'Server time: ' + timeString;
+        // });
+        const mediaStreamConstraints = {
+          video: true,
+        };
+        let localstream;
+        function gotLocalMediaStream(mediaStream) {
+          localStream = mediaStream;
+          localVideo.srcObject = mediaStream;
+          socket.emit("room number",{"roomNumber":roomNumber});
+        }
+        function handleLocalMediaStreamError(error) {
+          console.log('navigator.getUserMedia error: ', error);
+        }
+        navigator.mediaDevices.getUserMedia(mediaStreamConstraints).then(gotLocalMediaStream).catch(handleLocalMediaStreamError);
+        function stopLocalStream(){
+          const tracks = localStream.getTracks();
+          tracks.forEach(function(track) {
+            track.stop();
+          });
+          socket.emit("stop");
+        };
+    </script>
+
+  </html>
